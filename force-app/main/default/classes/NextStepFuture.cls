@@ -19,52 +19,83 @@
  */
 public with sharing class NextStepFuture {
 
-    /* 
-     * Question 1
-     * Update/Uncomment the template code to create a method
-     * Create a future method that updates all account and opportunities next step to 'Meeting in the future'
-     * Account Next Step field is a custom field
-     * Opportunity Next Step field is a standard field
-     * Update the corresponding test class AsynchronousTest and test method nextStepFuture_testUpdateAllNextStep to cover test this method
+    /*
+     * Question 1:
+     * Future method to update all Account and Opportunity next steps to 'Meeting in the future'
      */
-    //[public | private ] [static] data_type method_name (input parameters) {
-    //  The body of the method
-    //}
+    @future
+    public static void updateAllNextStep() {
+        String nextStepValue = 'Meeting in the future';
+
+        // Update Accounts (custom Next_Step__c field)
+        List<Account> accountsToUpdate = [
+            SELECT Id, Next_Step__c 
+            FROM Account
+        ];
+
+        for (Account acc : accountsToUpdate) {
+            acc.Next_Step__c = nextStepValue;
+        }
+
+        if (!accountsToUpdate.isEmpty()) {
+            update accountsToUpdate;
+        }
+
+        // Update Opportunities (standard NextStep field)
+        List<Opportunity> oppsToUpdate = [
+            SELECT Id, NextStep 
+            FROM Opportunity
+        ];
+
+        for (Opportunity opp : oppsToUpdate) {
+            opp.NextStep = nextStepValue;
+        }
+
+        if (!oppsToUpdate.isEmpty()) {
+            update oppsToUpdate;
+        }
+    }
 
     /*
-    * Question 2
-    * Update/Uncomment the template code to create a method
-    * Create a method that inserts a big deal opportunity and updates the user role name to 'CRO'
-    * Update the corresponding test class AsynchronousTest and test method nextStepFuture_testCreateDealAndUpdateRole to cover test this method
-    */
-    //Mix DML Error happens when you try to perform DML operations on setup and non-setup objects in a single transaction.
+     * Question 2:
+     * Inserts a big deal opportunity and schedules a future method to update the user's role to 'CRO'
+     */
     public static void createDealAndUpdateRole() {
         Opportunity bigDeal = new Opportunity();
         insertBigDeal(bigDeal);
 
-        UserRole[] roles = [SELECT Id, Name FROM UserRole WHERE Id = :UserInfo.getUserRoleId() OR Name = 'CRO' LIMIT 1];
-        updateUserRoleName(roles);
+        // Schedule role update as a future call to avoid Mixed DML error
+        updateUserRoleNameAsync();
     }
 
-    // Helper method to insert big deal
+    // Helper method to insert big deal opportunity
     private static void insertBigDeal(Opportunity opp) {
         opp.Amount = 1000000;
         opp.Name = 'Big Deal';
         opp.StageName = 'Closed Won'; 
         opp.CloseDate = Date.today();
-        
+
         insert opp;
     }
 
+    // Future method to handle UserRole DML in separate transaction
+    @future
+    private static void updateUserRoleNameAsync() {
+        UserRole[] roles = [
+            SELECT Id, Name 
+            FROM UserRole 
+            WHERE Id = :UserInfo.getUserRoleId() OR Name = 'CRO' 
+            LIMIT 1
+        ];
 
-    // Helper method to update role name
-    private static void updateUserRoleName(UserRole[] roles){
         UserRole role;
+
         if (roles.isEmpty()) {
             role = new UserRole();
             role.portalType = 'None'; 
             role.CaseAccessForAccountOwner = 'Edit'; 
-            // role.OpportunityAccessForAccountOwner = 'Edit'; //This may need to be uncommented depending on your orgs Organization Wide Defaults(OWD) settings. If you are receiving FIELD_INTEGRITY_EXCEPTION, field integrity exception: unknown (Opportunity access level below organization default): [unknown], uncomment this line.
+            // Uncomment if needed depending on org defaults:
+            // role.OpportunityAccessForAccountOwner = 'Edit';
         } else {
             role = roles[0];
         }
